@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Impacteers — Weekly KPI Dashboard</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e28;
+    --border: #232735;
+    --border2: #2e3347;
+    --accent: #4f7fff;
+    --accent2: #7c5cfc;
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --text: #e8eaf0;
+    --text2: #8b90a0;
+    --text3: #555c72;
+    --pill-up: rgba(34,197,94,0.12);
+    --pill-down: rgba(239,68,68,0.12);
+    --pill-warn: rgba(245,158,11,0.12);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,15,20,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex; align-items: center; gap: 16px;
+    height: 56px;
+  }
+  .logo { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; color: var(--text); letter-spacing: -0.3px; }
+  .logo span { color: var(--accent); }
+  .header-title { font-size: 13px; color: var(--text2); border-left: 1px solid var(--border2); padding-left: 16px; margin-left: 4px; }
+  .header-spacer { flex: 1; }
+
+  /* Auth status pill */
+  .auth-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 20px; cursor: pointer;
+    font-size: 12px; font-weight: 500; transition: all .2s;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .auth-pill.live { border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.08); color: var(--green); }
+  .auth-pill.dummy { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.08); color: var(--amber); }
+  .auth-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .auth-pill.loading .dot { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .prop-selector {
+    display: flex; gap: 4px; align-items: center;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 3px;
+  }
+  .prop-btn {
+    padding: 4px 10px; border-radius: 6px; border: none; background: transparent;
+    color: var(--text2); font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer; transition: all .15s; white-space: nowrap;
+  }
+  .prop-btn.active { background: var(--accent); color: #fff; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    padding: 12px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-label { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .5px; }
+  select, .date-input {
+    background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text); border-radius: 6px; padding: 5px 10px;
+    font-size: 12px; font-family: 'IBM Plex Sans', sans-serif;
+    cursor: pointer; outline: none;
+  }
+  select:focus, .date-input:focus { border-color: var(--accent); }
+
+  .toggle-btn {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border2);
+    background: transparent; color: var(--text2); font-size: 12px; cursor: pointer; transition: all .15s;
+  }
+  .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .filter-status {
+    margin-left: auto; font-size: 11px; color: var(--text3);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  .section { margin-bottom: 40px; }
+  .section-header { margin-bottom: 16px; }
+  .section-title { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .section-sub { font-size: 12px; color: var(--text3); }
+
+  /* ── KPI CARDS ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media(max-width:900px){ .kpi-grid{ grid-template-columns:repeat(2,1fr); } }
+
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; position: relative; overflow: hidden; transition: border-color .2s;
+  }
+  .kpi-card:hover { border-color: var(--border2); }
+  .kpi-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0; transition: opacity .2s;
+  }
+  .kpi-card:hover::before { opacity: 1; }
+  .kpi-label { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; color: var(--text); line-height: 1; margin-bottom: 10px; }
+  .kpi-delta {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .kpi-delta.up { background: var(--pill-up); color: var(--green); }
+  .kpi-delta.down { background: var(--pill-down); color: var(--red); }
+  .kpi-prev { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .kpi-source { font-size: 10px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 8px; }
+
+  /* ── CHARTS GRID ── */
+  .charts-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:800px){ .charts-2col{ grid-template-columns:1fr; } }
+
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .chart-meta { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-bottom: 16px; }
+
+  /* Bar charts */
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label { font-size: 12px; color: var(--text2); min-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+  .bar-val { font-size: 12px; color: var(--text2); min-width: 60px; text-align: right; font-family: 'IBM Plex Mono', monospace; }
+
+  /* Donut */
+  .donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .donut-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-pct { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text3); }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 500;
+    color: var(--text3); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .5px;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  .data-table td { padding: 9px 12px; font-size: 12px; color: var(--text2); border-bottom: 1px solid var(--border); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: var(--surface2); }
+  .data-table td:first-child { color: var(--text); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  /* Pos badge */
+  .pos-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .pos-badge.up { background: var(--pill-up); color: var(--green); }
+  .pos-badge.warn { background: var(--pill-warn); color: var(--amber); }
+  .pos-badge.down { background: var(--pill-down); color: var(--red); }
+
+  /* Status tag */
+  .status-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: 'IBM Plex Mono', monospace; }
+  .status-tag.green { background: var(--pill-up); color: var(--green); }
+  .status-tag.amber { background: var(--pill-warn); color: var(--amber); }
+  .status-tag.red { background: var(--pill-down); color: var(--red); }
+
+  /* Range filter */
+  .range-filter { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .range-filter input[type=number] {
+    width: 70px; background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: 12px; font-family: 'IBM Plex Mono', monospace; outline: none;
+  }
+  .range-filter button {
+    padding: 5px 14px; background: var(--accent); border: none; border-radius: 6px;
+    color: #fff; font-size: 12px; cursor: pointer; font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  /* Branded split */
+  .branded-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .branded-grid{grid-template-columns:1fr;} }
+
+  .branded-bar-section { display: flex; flex-direction: column; gap: 12px; }
+  .branded-item { }
+  .branded-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: flex; justify-content: space-between; }
+  .branded-track { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+  .branded-fill-b { height: 100%; border-radius: 5px; background: linear-gradient(90deg,#4f7fff,#7c5cfc); transition: width .8s; }
+  .branded-fill-nb { height: 100%; border-radius: 5px; background: linear-gradient(90deg,#22c55e,#14b8a6); transition: width .8s; }
+
+  /* LLM section */
+  .llm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .llm-grid{grid-template-columns:1fr;} }
+
+  /* Engagement */
+  .eng-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .eng-grid{grid-template-columns:1fr;} }
+
+  /* KPI tracker */
+  .tracker-table { width: 100%; border-collapse: collapse; }
+  .tracker-table th { text-align: left; padding: 8px 12px; font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing:.5px; border-bottom: 1px solid var(--border); }
+  .tracker-table td { padding: 10px 12px; font-size: 13px; color: var(--text2); border-bottom: 1px solid var(--border); }
+  .tracker-table tr:last-child td { border-bottom: none; }
+  .tracker-table td:first-child { color: var(--text); font-weight: 500; }
+
+  /* Loading skeleton */
+  .skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* Error state */
+  .error-banner {
+    background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25);
+    color: #fca5a5; border-radius: 8px; padding: 12px 16px; font-size: 12px;
+    display: none; margin-bottom: 16px;
+  }
+
+  /* Connect banner */
+  #connect-banner {
+    background: linear-gradient(135deg, rgba(79,127,255,0.08), rgba(124,92,252,0.08));
+    border: 1px solid rgba(79,127,255,0.25);
+    border-radius: 12px; padding: 20px 24px;
+    display: flex; align-items: center; gap: 16px; margin-bottom: 28px;
+  }
+  #connect-banner.hidden { display: none; }
+  .connect-icon { font-size: 24px; }
+  .connect-text h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .connect-text p { font-size: 12px; color: var(--text2); }
+  .connect-btn {
+    margin-left: auto; padding: 8px 20px; background: var(--accent);
+    border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 500;
+    cursor: pointer; white-space: nowrap; font-family: 'IBM Plex Sans', sans-serif;
+    transition: all .2s;
+  }
+  .connect-btn:hover { background: #3d6ee8; transform: translateY(-1px); }
+
+  footer { text-align: center; padding: 32px 24px; color: var(--text3); font-size: 11px; font-family: 'IBM Plex Mono', monospace; border-top: 1px solid var(--border); margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">Impact<span>eers</span></div>
+  <div class="header-title">Weekly KPI Dashboard</div>
+
+  <!-- Property selector -->
+  <div class="prop-selector" id="propSelector" style="margin-left:16px;">
+    <button class="prop-btn active" data-prop="421539587" onclick="switchProperty(this)">Main</button>
+    <button class="prop-btn" data-prop="528807769" onclick="switchProperty(this)">FutureJobs</button>
+    <button class="prop-btn" data-prop="510164499" onclick="switchProperty(this)">Exam Prep</button>
+  </div>
+
+  <div class="header-spacer"></div>
+
+  <!-- Auth status pill -->
+  <div class="auth-pill dummy" id="authPill" onclick="triggerAuth()">
+    <div class="dot"></div>
+    <span id="authLabel">Connect Google</span>
+  </div>
+</header>
+
+<!-- ── FILTER BAR ── -->
+<div class="filter-bar">
+  <div class="filter-group">
+    <span class="filter-label">Period</span>
+    <select id="dateRange" onchange="refreshData()">
+      <option value="7">Last 7 days</option>
+      <option value="14">Last 14 days</option>
+      <option value="28">Last 28 days</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Domain</span>
+    <select id="domainFilter" onchange="refreshData()">
+      <option value="">All domains</option>
+      <option value="www.impacteers.com">impacteers.com (main)</option>
+      <option value="futurejobs.impacteers.com">futurejobs</option>
+      <option value="recruitment.impacteers.com">recruitment</option>
+      <option value="examprep.impacteers.com">examprep</option>
+      <option value="blog.impacteers.com">blog</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Channel</span>
+    <select id="channelFilter" onchange="refreshData()">
+      <option value="">All channels</option>
+      <option value="Organic Search">Organic search</option>
+      <option value="Direct">Direct</option>
+      <option value="Paid Social">Paid social</option>
+      <option value="Referral">Referral</option>
+    </select>
+  </div>
+  <button class="toggle-btn" id="organicToggle" onclick="toggleOrganic()">Organic + LLM only</button>
+  <span class="filter-status" id="filterStatus">Showing: all domains · all channels · Loading…</span>
+</div>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <!-- Connect banner -->
+  <div id="connect-banner">
+    <div class="connect-icon">🔗</div>
+    <div class="connect-text">
+      <h3>Connect your Google Account to load live data</h3>
+      <p>One-click OAuth — grants access to GA4 + Search Console. Your credentials never leave the browser.</p>
+    </div>
+    <button class="connect-btn" onclick="triggerAuth()">Connect Google Account</button>
+  </div>
+
+  <div id="errorBanner" class="error-banner">⚠ API error — check console for details. Showing last loaded data.</div>
+
+  <!-- ── SECTION 1: KPI OVERVIEW ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Are we growing this week?</div>
+      <div class="section-sub">Core platform health — total reach, visits, and search visibility. WoW delta from two dateRange calls in a single GA4 request.</div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total Users</div>
+        <div class="kpi-value" id="kpi-users">—</div>
+        <div class="kpi-delta" id="kpi-users-delta">—</div>
+        <div class="kpi-prev" id="kpi-users-prev"></div>
+        <div class="kpi-source">GA4 · metric: totalUsers</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Sessions</div>
+        <div class="kpi-value" id="kpi-sessions">—</div>
+        <div class="kpi-delta" id="kpi-sessions-delta">—</div>
+        <div class="kpi-prev" id="kpi-sessions-prev"></div>
+        <div class="kpi-source">GA4 · metric: sessions</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">GSC Clicks</div>
+        <div class="kpi-value" id="kpi-clicks">—</div>
+        <div class="kpi-delta" id="kpi-clicks-delta">—</div>
+        <div class="kpi-prev" id="kpi-clicks-prev"></div>
+        <div class="kpi-source">GSC · searchAnalytics</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg. Search Position</div>
+        <div class="kpi-value" id="kpi-pos">—</div>
+        <div class="kpi-delta" id="kpi-pos-delta">—</div>
+        <div class="kpi-prev" id="kpi-pos-prev"></div>
+        <div class="kpi-source">GSC · position average</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 2: TRAFFIC SOURCES ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Where is our traffic coming from?</div>
+      <div class="section-sub">Sessions by domain and channel mix. Switch property above for property-level breakdown.</div>
+    </div>
+    <div class="charts-2col">
+      <div class="chart-card">
+        <div class="chart-title">Sessions by domain — <span id="domainChartPeriod">7 days</span></div>
+        <div class="chart-meta">GA4 · dimensions: hostname · metrics: sessions</div>
+        <div class="bar-chart" id="domainBars">
+          <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Channel mix</div>
+        <div class="chart-meta">GA4 · dimension: sessionDefaultChannelGroup</div>
+        <div class="donut-wrap">
+          <svg id="channelDonut" width="120" height="120" viewBox="0 0 120 120"></svg>
+          <div class="donut-legend" id="channelLegend">
+            <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 3: TOP CONTENT ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">What content is actually working?</div>
+      <div class="section-sub">Pages ranked by total users · GA4 · dimensions: pagePath · metrics: totalUsers, engagementRate</div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Top pages by total users</div>
+      <div class="chart-meta">Showing top 10 pages for selected period & domain</div>
+      <table class="data-table" id="topPagesTable">
+        <thead><tr><th>Page</th><th>Users</th><th>Eng. rate</th><th>Avg time</th></tr></thead>
+        <tbody><tr><td colspan="4" style="color:var(--text3);">Waiting for data…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── SECTION 4: GSC OPPORTUNITIES ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">What opportunities do we have to improve rankings?</div>
+      <div class="section-sub">Position 4–20 with high impressions but low CTR = highest ROI optimisation targets.</div>
+    </div>
+    <div class="charts-2col" style="margin-bottom:16px;">
+      <div class="chart-card">
+        <div class="chart-title">CTR by position</div>
+        <div class="chart-meta">GSC · avg CTR per position bucket</div>
+        <div class="bar-chart" id="ctrByPosBars">
+          <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Opportunity summary</div>
+        <div class="chart-meta">GSC · pages below 5% CTR benchmark</div>
+        <div id="oppSummary" style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Opportunity pages</div>
+      <div class="chart-meta">GSC · score = impressions × (5% − actual CTR) · sorted by opportunity</div>
+      <div class="range-filter">
+        <span style="font-size:12px;color:var(--text2);">Show positions between</span>
+        <input type="number" id="posMin" value="4" min="1" max="100"/>
+        <span style="font-size:12px;color:var(--text2);">and</span>
+        <input type="number" id="posMax" value="20" min="1" max="100"/>
+        <button onclick="renderOpportunityTable()">Apply</button>
+      </div>
+      <table class="data-table" id="oppTable">
+        <thead><tr><th>Page / Query</th><th>Position</th><th>Impressions</th><th>CTR</th><th>Opp. Score</th></tr></thead>
+        <tbody><tr><td colspan="5" style="color:var(--text3);">Waiting for data…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── SECTION 5: BRANDED vs NON-BRANDED ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Are people finding us without knowing us?</div>
+      <div class="section-sub">Branded vs non-branded query split · classified client-side from raw GSC query data</div>
+    </div>
+    <div class="branded-grid">
+      <div class="chart-card">
+        <div class="chart-title">Branded vs Non-branded</div>
+        <div class="chart-meta">GSC · impressions & clicks split</div>
+        <div class="branded-bar-section" id="brandedBars">
+          <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top non-branded queries</div>
+        <div class="chart-meta">GSC · high-impression discovery terms</div>
+        <table class="data-table" id="nonBrandedTable">
+          <thead><tr><th>Query</th><th>Impr.</th><th>CTR</th><th>Pos.</th></tr></thead>
+          <tbody><tr><td colspan="4" style="color:var(--text3);">Waiting for data…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 6: LLM TRAFFIC ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Are AI assistants recommending us?</div>
+      <div class="section-sub">LLM referral traffic from ChatGPT, Perplexity, Gemini, Claude — high-intent discovery channel.</div>
+    </div>
+    <div class="llm-grid">
+      <div class="chart-card">
+        <div class="chart-title">Sessions by AI platform</div>
+        <div class="chart-meta">GA4 · sessionMedium = referral AND source in LLM domain list</div>
+        <div class="bar-chart" id="llmBars">
+          <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">LLM traffic quality</div>
+        <div class="chart-meta">GA4 · engagementRate + avgSessionDuration per LLM source</div>
+        <table class="data-table" id="llmTable">
+          <thead><tr><th>Source</th><th>Medium</th><th>Sessions</th><th>Eng. rate</th><th>Avg time</th></tr></thead>
+          <tbody><tr><td colspan="4" style="color:var(--text3);">Waiting for data…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 7: ENGAGEMENT ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Are visitors actually engaging or just bouncing?</div>
+      <div class="section-sub">Engagement rate and session duration by source · GA4 · sessionSourceMedium</div>
+    </div>
+    <div class="eng-grid">
+      <div class="chart-card">
+        <div class="chart-title">Engagement rate by source</div>
+        <div class="chart-meta">GA4 · metric: engagementRate per sessionSourceMedium</div>
+        <div class="bar-chart" id="engRateBars">
+          <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Avg. engagement time by source</div>
+        <div class="chart-meta">GA4 · metric: averageSessionDuration per sessionSourceMedium</div>
+        <div class="bar-chart" id="engTimeBars">
+          <div style="color:var(--text3);font-size:12px;">Waiting for data…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 8: KPI STATUS TRACKER ── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">KPI status tracker</div>
+      <div class="section-sub">Status tags computed from live data — thresholds defined in CONFIG object below</div>
+    </div>
+    <div class="chart-card">
+      <table class="tracker-table" id="kpiTracker">
+        <thead><tr><th>KPI</th><th>Current</th><th>Target</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Sessions</td><td id="t-sessions">—</td><td>20,000</td><td id="t-sessions-tag">—</td></tr>
+          <tr><td>Engagement rate</td><td id="t-eng">—</td><td>50%</td><td id="t-eng-tag">—</td></tr>
+          <tr><td>GSC avg position</td><td id="t-pos">—</td><td>&lt; 5</td><td id="t-pos-tag">—</td></tr>
+          <tr><td>LLM referral sessions</td><td id="t-llm">—</td><td>500</td><td id="t-llm-tag">—</td></tr>
+          <tr><td>New user %</td><td id="t-newusers">—</td><td>&gt; 88%</td><td id="t-newusers-tag">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  All data pulled live from GA4 Data API + Google Search Console API · Impacteers / Genrichers Innovations Pvt Ltd · Chennai · Dashboard v4.0 · Apr 2026
+</footer>
+
+<!-- ════════════════════════════════════════════
+     JAVASCRIPT — OAuth + API Layer
+════════════════════════════════════════════ -->
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+const CONFIG = {
+  CLIENT_ID: '371775850697-mf5grrg4f3vvc2gbtnjauljnjfcq7aua.apps.googleusercontent.com',
+  SCOPES: [
+    'https://www.googleapis.com/auth/analytics.readonly',
+    'https://www.googleapis.com/auth/webmasters.readonly'
+  ].join(' '),
+
+  // GA4 property IDs per property selector
+  GA4_PROPERTIES: {
+    '421539587': 'properties/421539587',  // Main
+    '528807769': 'properties/528807769',  // FutureJobs
+    '510164499': 'properties/510164499',  // ExamPrep
+  },
+
+  // Whitelisted domains only — everything else is excluded from all GA4 queries
+  ALLOWED_DOMAINS: [
+    'www.impacteers.com',
+    'impacteers.com',
+    'futurejobs.impacteers.com',
+    'recruitment.impacteers.com',
+    'examprep.impacteers.com',
+    'blog.impacteers.com'
+  ],
+
+  // GSC site URLs per property — Domain properties use sc-domain: prefix
+  GSC_SITES: {
+    '421539587': 'sc-domain:impacteers.com',
+    '528807769': 'sc-domain:impacteers.com',
+    '510164499': 'sc-domain:impacteers.com',
+  },
+
+  KPI_TARGETS: {
+    sessions: 20000,
+    engagementRate: 0.50,
+    position: 5,
+    llmSessions: 500,
+    newUserPct: 0.88
+  },
+
+  BRAND_TERMS: ['impacteers', 'futurejobs', 'xooper', 'genrichers'],
+
+  LLM_DOMAINS: [
+    'chatgpt.com', 'chat.openai.com',
+    'perplexity.ai',
+    'claude.ai',
+    'gemini.google.com', 'bard.google.com',
+    'copilot.microsoft.com',
+    'you.com', 'kagi.com',
+    'character.ai', 'poe.com',
+    'phind.com', 'mistral.ai',
+    'groq.com', 'meta.ai'
+  ],
+
+  CHANNEL_COLORS: ['#4f7fff','#7c5cfc','#22c55e','#f59e0b','#ef4444','#14b8a6'],
+  LLM_COLORS: ['#f59e0b','#4f7fff','#22c55e','#7c5cfc','#ef4444','#14b8a6']
+};
+
+// ── STATE ────────────────────────────────────────────────
+let STATE = {
+  accessToken: null,
+  tokenClient: null,
+  activeProperty: '421539587',
+  organicOnly: false,
+  rawGSCQueries: [],
+  rawLLMData: [],
+  rawEngData: [],
+  lastKPIData: {}
+};
+
+// ── AUTH ─────────────────────────────────────────────────
+window.onload = () => {
+  // GIS may not be loaded yet — wait for it
+  const tryInit = setInterval(() => {
+    if (window.google && google.accounts) {
+      clearInterval(tryInit);
+      STATE.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.CLIENT_ID,
+        scope: CONFIG.SCOPES,
+        callback: onTokenResponse
+      });
+    }
+  }, 200);
+};
+
+function triggerAuth() {
+  if (!STATE.tokenClient) {
+    alert('Google Identity Services still loading — please wait a moment and try again.');
+    return;
+  }
+  setAuthPill('loading', 'Connecting…');
+  STATE.tokenClient.requestAccessToken({ prompt: '' });
+}
+
+function onTokenResponse(resp) {
+  if (resp.error) {
+    setAuthPill('dummy', 'Connect Google');
+    showError('OAuth error: ' + resp.error);
+    return;
+  }
+  STATE.accessToken = resp.access_token;
+  setAuthPill('live', 'Live Data');
+  document.getElementById('connect-banner').classList.add('hidden');
+  refreshData();
+}
+
+function setAuthPill(state, label) {
+  const pill = document.getElementById('authPill');
+  pill.className = 'auth-pill ' + state;
+  document.getElementById('authLabel').textContent = label;
+}
+
+// ── PROPERTY SWITCH ──────────────────────────────────────
+function switchProperty(btn) {
+  document.querySelectorAll('.prop-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  STATE.activeProperty = btn.dataset.prop;
+  if (STATE.accessToken) refreshData();
+}
+
+// ── ORGANIC TOGGLE ───────────────────────────────────────
+function toggleOrganic() {
+  STATE.organicOnly = !STATE.organicOnly;
+  const btn = document.getElementById('organicToggle');
+  btn.classList.toggle('active', STATE.organicOnly);
+  if (STATE.accessToken) refreshData();
+}
+
+// ── MAIN REFRESH ─────────────────────────────────────────
+async function refreshData() {
+  if (!STATE.accessToken) return;
+
+  const days = parseInt(document.getElementById('dateRange').value);
+  const domain = document.getElementById('domainFilter').value;
+  const propId = CONFIG.GA4_PROPERTIES[STATE.activeProperty];
+  const gscSite = CONFIG.GSC_SITES[STATE.activeProperty];
+
+  updateFilterStatus(days, domain);
+  hideError();
+
+  try {
+    await Promise.all([
+      fetchGA4KPIs(propId, days, domain),
+      fetchGA4Domains(propId, days),
+      fetchGA4Channels(propId, days, domain),
+      fetchGA4TopPages(propId, days, domain),
+      fetchGA4LLM(propId, days),
+      fetchGA4Engagement(propId, days),
+      fetchGSCOverview(gscSite, days),
+      fetchGSCQueries(gscSite, days),
+    ]);
+    renderKPITracker();
+  } catch(e) {
+    showError(e.message);
+    console.error(e);
+  }
+}
+
+// ── GA4 API HELPERS ──────────────────────────────────────
+async function ga4Request(propertyId, body) {
+  const url = `https://analyticsdata.googleapis.com/v1beta/${propertyId}:runReport`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + STATE.accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error('GA4 API: ' + (err.error?.message || resp.status));
+  }
+  return resp.json();
+}
+
+async function gscRequest(siteUrl, body) {
+  // Domain properties use sc-domain: prefix — must be encoded as-is
+  const encoded = encodeURIComponent(siteUrl);
+  const url = `https://www.googleapis.com/webmasters/v3/sites/${encoded}/searchAnalytics/query`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + STATE.accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error('GSC API: ' + (err.error?.message || resp.status));
+  }
+  return resp.json();
+}
+
+// ── DATE HELPERS ─────────────────────────────────────────
+function dateOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0,10);
+}
+
+// ── GA4: KPIs (WoW) — two separate calls for clean delta ──
+async function fetchGA4KPIs(propId, days, domain) {
+  const domainFilter = domain ? { dimensionFilter: buildDomainFilter(domain) } : {};
+  const baseBody = {
+    metrics: [
+      { name: 'totalUsers' },
+      { name: 'sessions' },
+      { name: 'engagementRate' },
+      { name: 'newUsers' }
+    ],
+    ...domainFilter
+  };
+
+  const [thisData, prevData] = await Promise.all([
+    ga4Request(propId, { ...baseBody, dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }] }),
+    ga4Request(propId, { ...baseBody, dateRanges: [{ startDate: `${days*2}daysAgo`, endDate: `${days+1}daysAgo` }] })
+  ]);
+
+  const thisWeek = parseMetricRow(thisData.rows?.[0]);
+  const lastWeek = parseMetricRow(prevData.rows?.[0]);
+
+  setKPI('users',    thisWeek.users,    lastWeek.users,    false, fmt);
+  setKPI('sessions', thisWeek.sessions, lastWeek.sessions, false, fmt);
+
+  const newUserPct = thisWeek.users > 0 ? thisWeek.newUsers / thisWeek.users : 0;
+  STATE.lastKPIData = {
+    sessions: thisWeek.sessions,
+    engagementRate: thisWeek.engRate,
+    newUserPct
+  };
+}
+
+  setKPI('users', thisWeek.users, lastWeek.users, false, fmt);
+  setKPI('sessions', thisWeek.sessions, lastWeek.sessions, false, fmt);
+
+  const newUserPct = thisWeek.users > 0 ? thisWeek.newUsers / thisWeek.users : 0;
+  STATE.lastKPIData = {
+    sessions: thisWeek.sessions,
+    engagementRate: thisWeek.engRate,
+    newUserPct
+  };
+}
+
+function parseMetricRow(row) {
+  return {
+    users:    parseFloat(row.metricValues?.[0]?.value) || 0,
+    sessions: parseFloat(row.metricValues?.[1]?.value) || 0,
+    engRate:  parseFloat(row.metricValues?.[2]?.value) || 0,
+    newUsers: parseFloat(row.metricValues?.[3]?.value) || 0
+  };
+}
+
+function setKPI(key, current, prev, invertDelta, formatter) {
+  const el = document.getElementById('kpi-' + key);
+  const deltaEl = document.getElementById('kpi-' + key + '-delta');
+  const prevEl = document.getElementById('kpi-' + key + '-prev');
+  if (!el) return;
+  el.textContent = formatter ? formatter(current) : current;
+  if (prev && prev > 0) {
+    const pct = ((current - prev) / prev) * 100;
+    const isPositive = invertDelta ? pct < 0 : pct >= 0;
+    deltaEl.className = 'kpi-delta ' + (isPositive ? 'up' : 'down');
+    deltaEl.textContent = (pct >= 0 ? '▲ ' : '▼ ') + Math.abs(pct).toFixed(1) + '% WoW';
+    if (prevEl) prevEl.textContent = 'vs ' + (formatter ? formatter(prev) : prev) + ' last period';
+  } else {
+    deltaEl.textContent = '—';
+  }
+}
+
+// ── GA4: Domain breakdown ────────────────────────────────
+async function fetchGA4Domains(propId, days) {
+  const body = {
+    dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
+    dimensions: [{ name: 'hostname' }],
+    metrics: [{ name: 'sessions' }],
+    // Always whitelist — never show unrelated domains in this chart
+    dimensionFilter: {
+      filter: {
+        fieldName: 'hostname',
+        inListFilter: { values: CONFIG.ALLOWED_DOMAINS }
+      }
+    },
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 10
+  };
+  const data = await ga4Request(propId, body);
+  const rows = (data.rows || []).map(r => ({
+    label: r.dimensionValues[0].value,
+    value: parseInt(r.metricValues[0].value)
+  }));
+  renderBarChart('domainBars', rows, '#4f7fff', '#7c5cfc');
+  document.getElementById('domainChartPeriod').textContent = `${days} days`;
+}
+
+// ── GA4: Channel mix ─────────────────────────────────────
+async function fetchGA4Channels(propId, days, domain) {
+  const body = {
+    dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
+    dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+    metrics: [{ name: 'sessions' }],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    dimensionFilter: buildDomainFilter(domain)
+  };
+  const data = await ga4Request(propId, body);
+  const rows = (data.rows || []).map(r => ({
+    label: r.dimensionValues[0].value,
+    value: parseInt(r.metricValues[0].value)
+  }));
+  renderDonut('channelDonut', 'channelLegend', rows, CONFIG.CHANNEL_COLORS);
+}
+
+// ── GA4: Top pages ───────────────────────────────────────
+async function fetchGA4TopPages(propId, days, domain) {
+  const body = {
+    dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
+    dimensions: [{ name: 'pagePath' }],
+    metrics: [
+      { name: 'totalUsers' },
+      { name: 'engagementRate' },
+      { name: 'averageSessionDuration' }
+    ],
+    orderBys: [{ metric: { metricName: 'totalUsers' }, desc: true }],
+    limit: 10,
+    dimensionFilter: buildDomainFilter(domain)
+  };
+  const data = await ga4Request(propId, body);
+  const rows = data.rows || [];
+  const tbody = document.querySelector('#topPagesTable tbody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text3);">No data</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td title="${r.dimensionValues[0].value}">${r.dimensionValues[0].value}</td>
+      <td class="mono">${fmt(r.metricValues[0].value)}</td>
+      <td class="mono">${(parseFloat(r.metricValues[1].value)*100).toFixed(1)}%</td>
+      <td class="mono">${fmtTime(r.metricValues[2].value)}</td>
+    </tr>`).join('');
+}
+
+// ── GA4: LLM Traffic ─────────────────────────────────────
+async function fetchGA4LLM(propId, days) {
+  // Strategy: fetch sessionSourceMedium, then filter client-side for LLM sources
+  // This avoids the inListFilter 100-value limit and catches all LLM referrals
+  const body = {
+    dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
+    dimensions: [
+      { name: 'sessionSource' },
+      { name: 'sessionMedium' }
+    ],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'engagementRate' },
+      { name: 'averageSessionDuration' }
+    ],
+    dimensionFilter: {
+      filter: {
+        fieldName: 'sessionMedium',
+        stringFilter: { matchType: 'EXACT', value: 'referral' }
+      }
+    },
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 100
+  };
+
+  const data = await ga4Request(propId, body);
+  const allReferrals = data.rows || [];
+
+  // Filter client-side: keep only rows where source matches LLM domains
+  const rows = allReferrals.filter(r => {
+    const source = r.dimensionValues[0].value.toLowerCase();
+    return CONFIG.LLM_DOMAINS.some(d => source.includes(d.replace('www.', '')));
+  });
+
+  STATE.rawLLMData = rows;
+  const totalLLM = rows.reduce((s,r) => s + parseInt(r.metricValues[0].value), 0);
+  STATE.lastKPIData.llmSessions = totalLLM;
+
+  // Bar chart — label as "source / medium"
+  const barRows = rows.map(r => ({
+    label: r.dimensionValues[0].value,
+    value: parseInt(r.metricValues[0].value)
+  }));
+  renderBarChart('llmBars', barRows, '#f59e0b', '#ef4444');
+
+  // Table
+  const tbody = document.querySelector('#llmTable tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text3);">No LLM referrals found in this period — they appear as referral / &lt;source&gt; in GA4</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.dimensionValues[0].value}</td>
+      <td class="mono" style="color:var(--text3);font-size:11px;">${r.dimensionValues[1].value}</td>
+      <td class="mono">${fmt(r.metricValues[0].value)}</td>
+      <td class="mono">${(parseFloat(r.metricValues[1].value)*100).toFixed(1)}%</td>
+      <td class="mono">${fmtTime(r.metricValues[2].value)}</td>
+    </tr>`).join('');
+  tbody.innerHTML += `<tr style="font-weight:600;border-top:1px solid var(--border2);">
+    <td colspan="2">Total LLM referrals</td>
+    <td class="mono">${fmt(totalLLM)}</td>
+    <td colspan="2"></td>
+  </tr>`;
+}
+
+// ── GA4: Engagement by source ─────────────────────────────
+async function fetchGA4Engagement(propId, days) {
+  const body = {
+    dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
+    dimensions: [{ name: 'sessionSourceMedium' }],
+    metrics: [
+      { name: 'sessions' },
+      { name: 'engagementRate' },
+      { name: 'averageSessionDuration' }
+    ],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 8
+  };
+  const data = await ga4Request(propId, body);
+  const rows = data.rows || [];
+
+  const engRows = rows.map(r => ({
+    label: r.dimensionValues[0].value,
+    value: parseFloat(r.metricValues[1].value) * 100
+  }));
+  renderBarChart('engRateBars', engRows, '#22c55e', '#14b8a6', '%');
+
+  const timeRows = rows.map(r => ({
+    label: r.dimensionValues[0].value,
+    value: parseFloat(r.metricValues[2].value)
+  }));
+  renderBarChart('engTimeBars', timeRows, '#4f7fff', '#7c5cfc', 's', v => fmtTime(v));
+
+  // update engagement rate in KPIs
+  if (rows.length) {
+    const totalSess = rows.reduce((s,r) => s + parseInt(r.metricValues[0].value), 0);
+    const wAvgEng = rows.reduce((s,r) => s + parseFloat(r.metricValues[1].value)*parseInt(r.metricValues[0].value), 0) / (totalSess || 1);
+    document.getElementById('t-eng').textContent = (wAvgEng*100).toFixed(1)+'%';
+    document.getElementById('t-eng-tag').innerHTML = statusTag(wAvgEng, CONFIG.KPI_TARGETS.engagementRate, 'rate');
+  }
+}
+
+// ── GSC: Overview KPIs ───────────────────────────────────
+async function fetchGSCOverview(siteUrl, days) {
+  const endDate = dateOffset(0);
+  const startDate = dateOffset(days);
+  const prevStart = dateOffset(days*2);
+  const prevEnd = dateOffset(days+1);
+
+  const [thisData, prevData] = await Promise.all([
+    gscRequest(siteUrl, { startDate, endDate, aggregationType: 'byProperty' }),
+    gscRequest(siteUrl, { startDate: prevStart, endDate: prevEnd, aggregationType: 'byProperty' })
+  ]);
+
+  // GSC totals — domain properties aggregate across all URLs
+  const thisTotals = thisData.rows?.[0] || {};
+  const prevTotals = prevData.rows?.[0] || {};
+
+  setKPI('clicks', thisTotals.clicks || 0, prevTotals.clicks || 0, false, fmt);
+  setKPI('pos', (thisTotals.position || 0).toFixed(1), (prevTotals.position || 0).toFixed(1), true, v => v);
+
+  STATE.lastKPIData.position = thisTotals.position || 0;
+  document.getElementById('t-pos').textContent = (thisTotals.position||0).toFixed(1);
+  document.getElementById('t-pos-tag').innerHTML = statusTag(thisTotals.position||99, CONFIG.KPI_TARGETS.position, 'position');
+}
+
+// ── GSC: Queries ─────────────────────────────────────────
+async function fetchGSCQueries(siteUrl, days) {
+  const endDate = dateOffset(0);
+  const startDate = dateOffset(days);
+
+  const data = await gscRequest(siteUrl, {
+    startDate, endDate,
+    dimensions: ['query'],
+    aggregationType: 'byProperty',
+    rowLimit: 500
+  });
+  STATE.rawGSCQueries = data.rows || [];
+
+  // Also fetch page-level for opportunity table
+  const pageData = await gscRequest(siteUrl, {
+    startDate, endDate,
+    dimensions: ['page'],
+    aggregationType: 'byProperty',
+    rowLimit: 500
+  });
+  STATE.rawGSCPages = pageData.rows || [];
+
+  renderBrandedSplit();
+  renderOpportunityTable();
+  renderCTRByPosition();
+}
+
+// ── RENDER: Branded vs Non-branded ───────────────────────
+function renderBrandedSplit() {
+  const rows = STATE.rawGSCQueries;
+  const branded = { impressions: 0, clicks: 0 };
+  const nonBranded = { impressions: 0, clicks: 0 };
+  const nonBrandedRows = [];
+
+  rows.forEach(r => {
+    const b = CONFIG.BRAND_TERMS.some(t => r.keys[0].toLowerCase().includes(t));
+    if (b) {
+      branded.impressions += r.impressions;
+      branded.clicks += r.clicks;
+    } else {
+      nonBranded.impressions += r.impressions;
+      nonBranded.clicks += r.clicks;
+      nonBrandedRows.push(r);
+    }
+  });
+
+  const totalImpr = branded.impressions + nonBranded.impressions;
+  const totalClicks = branded.clicks + nonBranded.clicks;
+
+  const bImprPct = totalImpr ? (branded.impressions/totalImpr*100).toFixed(1) : 0;
+  const nbImprPct = totalImpr ? (nonBranded.impressions/totalImpr*100).toFixed(1) : 0;
+  const bClkPct  = totalClicks ? (branded.clicks/totalClicks*100).toFixed(1) : 0;
+  const nbClkPct = totalClicks ? (nonBranded.clicks/totalClicks*100).toFixed(1) : 0;
+
+  document.getElementById('brandedBars').innerHTML = `
+    <div class="branded-item">
+      <div class="branded-label"><span>Branded impressions</span><span class="mono">${fmt(branded.impressions)} (${bImprPct}%)</span></div>
+      <div class="branded-track"><div class="branded-fill-b" style="width:${bImprPct}%"></div></div>
+    </div>
+    <div class="branded-item" style="margin-top:6px;">
+      <div class="branded-label"><span>Non-branded impressions</span><span class="mono">${fmt(nonBranded.impressions)} (${nbImprPct}%)</span></div>
+      <div class="branded-track"><div class="branded-fill-nb" style="width:${nbImprPct}%"></div></div>
+    </div>
+    <div style="height:12px;"></div>
+    <div class="branded-item">
+      <div class="branded-label"><span>Branded clicks</span><span class="mono">${fmt(branded.clicks)} (${bClkPct}%)</span></div>
+      <div class="branded-track"><div class="branded-fill-b" style="width:${bClkPct}%"></div></div>
+    </div>
+    <div class="branded-item" style="margin-top:6px;">
+      <div class="branded-label"><span>Non-branded clicks</span><span class="mono">${fmt(nonBranded.clicks)} (${nbClkPct}%)</span></div>
+      <div class="branded-track"><div class="branded-fill-nb" style="width:${nbClkPct}%"></div></div>
+    </div>
+  `;
+
+  // Top non-branded queries
+  const top = nonBrandedRows
+    .sort((a,b) => b.impressions - a.impressions)
+    .slice(0,10);
+  const tbody = document.querySelector('#nonBrandedTable tbody');
+  tbody.innerHTML = top.map(r => `
+    <tr>
+      <td>${r.keys[0]}</td>
+      <td class="mono">${fmt(r.impressions)}</td>
+      <td class="mono">${(r.ctr*100).toFixed(1)}%</td>
+      <td><span class="pos-badge ${posBadgeClass(r.position)}">${r.position.toFixed(1)}</span></td>
+    </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text3);">No data</td></tr>';
+}
+
+// ── RENDER: Opportunity table ─────────────────────────────
+function renderOpportunityTable() {
+  const posMin = parseFloat(document.getElementById('posMin').value) || 4;
+  const posMax = parseFloat(document.getElementById('posMax').value) || 20;
+  const BENCHMARK = 0.05;
+  const MIN_IMPR = 500;
+
+  const rows = (STATE.rawGSCPages || [])
+    .filter(r => r.position >= posMin && r.position <= posMax && r.impressions >= MIN_IMPR)
+    .map(r => ({ ...r, score: r.impressions * (BENCHMARK - r.ctr) }))
+    .filter(r => r.score > 0)
+    .sort((a,b) => b.score - a.score)
+    .slice(0, 20);
+
+  const tbody = document.querySelector('#oppTable tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td title="${r.keys[0]}">${r.keys[0]}</td>
+      <td><span class="pos-badge ${posBadgeClass(r.position)}">${r.position.toFixed(1)}</span></td>
+      <td class="mono">${fmt(r.impressions)}</td>
+      <td class="mono">${(r.ctr*100).toFixed(1)}%</td>
+      <td class="mono">${Math.round(r.score)}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text3);">No pages match criteria</td></tr>';
+
+  // Summary
+  const total = rows.reduce((s,r) => s + r.score, 0);
+  document.getElementById('oppSummary').innerHTML = `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:28px;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text);">${rows.length}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">pages in opportunity zone</div>
+    </div>
+    <div>
+      <div style="font-size:28px;font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--amber);">${fmt(Math.round(total))}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;">clicks left on the table</div>
+    </div>
+  `;
+}
+
+// ── RENDER: CTR by position ───────────────────────────────
+function renderCTRByPosition() {
+  const buckets = {};
+  (STATE.rawGSCPages || []).forEach(r => {
+    const bucket = Math.ceil(r.position);
+    if (!buckets[bucket]) buckets[bucket] = { ctr:0, count:0 };
+    buckets[bucket].ctr += r.ctr;
+    buckets[bucket].count++;
+  });
+  const rows = Object.keys(buckets)
+    .sort((a,b)=>a-b)
+    .slice(0,15)
+    .map(k => ({
+      label: 'Pos ' + k,
+      value: (buckets[k].ctr / buckets[k].count * 100)
+    }));
+  renderBarChart('ctrByPosBars', rows, '#22c55e', '#14b8a6', '%');
+}
+
+// ── RENDER: KPI Tracker ───────────────────────────────────
+function renderKPITracker() {
+  const d = STATE.lastKPIData;
+  document.getElementById('t-sessions').textContent = fmt(d.sessions||0);
+  document.getElementById('t-sessions-tag').innerHTML = statusTag(d.sessions||0, CONFIG.KPI_TARGETS.sessions, 'value');
+  document.getElementById('t-llm').textContent = fmt(d.llmSessions||0);
+  document.getElementById('t-llm-tag').innerHTML = statusTag(d.llmSessions||0, CONFIG.KPI_TARGETS.llmSessions, 'value');
+  const newPct = ((d.newUserPct||0)*100).toFixed(1)+'%';
+  document.getElementById('t-newusers').textContent = newPct;
+  document.getElementById('t-newusers-tag').innerHTML = statusTag(d.newUserPct||0, CONFIG.KPI_TARGETS.newUserPct, 'value');
+}
+
+// ── RENDER UTILITIES ──────────────────────────────────────
+function renderBarChart(containerId, rows, colorA, colorB, suffix='', labelFn=null) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!rows.length) { el.innerHTML = '<div style="color:var(--text3);font-size:12px;">No data</div>'; return; }
+  const max = Math.max(...rows.map(r => r.value), 1);
+  el.innerHTML = rows.map(r => {
+    const pct = (r.value / max * 100).toFixed(1);
+    const display = labelFn ? labelFn(r.value) : (r.value % 1 === 0 ? fmt(r.value) : r.value.toFixed(1)) + suffix;
+    return `
+      <div class="bar-row">
+        <div class="bar-label" title="${r.label}">${r.label}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${colorA},${colorB})"></div></div>
+        <div class="bar-val">${display}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderDonut(svgId, legendId, rows, colors) {
+  const total = rows.reduce((s,r) => s + r.value, 0) || 1;
+  const svg = document.getElementById(svgId);
+  const legend = document.getElementById(legendId);
+  const cx=60, cy=60, r=45, sw=18;
+  let cumAngle = -Math.PI/2;
+  let paths = '';
+
+  rows.forEach((row, i) => {
+    const fraction = row.value / total;
+    const angle = fraction * 2 * Math.PI;
+    if (fraction < 0.001) return;
+    const x1 = cx + r * Math.cos(cumAngle);
+    const y1 = cy + r * Math.sin(cumAngle);
+    const x2 = cx + r * Math.cos(cumAngle + angle);
+    const y2 = cy + r * Math.sin(cumAngle + angle);
+    const large = angle > Math.PI ? 1 : 0;
+    paths += `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${colors[i%colors.length]}" opacity="0.85"/>`;
+    cumAngle += angle;
+  });
+  // center hole
+  paths += `<circle cx="${cx}" cy="${cy}" r="${r-sw}" fill="${getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()}"/>`;
+
+  svg.innerHTML = paths;
+  legend.innerHTML = rows.map((r,i) => `
+    <div class="legend-row">
+      <div class="legend-dot" style="background:${colors[i%colors.length]}"></div>
+      <span>${r.label}</span>
+      <span class="legend-pct">${(r.value/total*100).toFixed(1)}%</span>
+    </div>`).join('');
+}
+
+// ── STATUS TAGS ───────────────────────────────────────────
+function statusTag(current, target, type) {
+  let tag, cls;
+  if (type === 'position') {
+    if (current <= target) { tag='Healthy'; cls='green'; }
+    else if (current <= target*1.5) { tag='Monitor'; cls='amber'; }
+    else { tag='At risk'; cls='red'; }
+  } else {
+    const r = current / target;
+    if (r >= 1.0) { tag='On track'; cls='green'; }
+    else if (r >= 0.8) { tag='Growing'; cls='amber'; }
+    else if (r >= 0.6) { tag='Monitor'; cls='amber'; }
+    else if (r >= 0.4) { tag='Early'; cls='amber'; }
+    else { tag='Below'; cls='red'; }
+  }
+  return `<span class="status-tag ${cls}">${tag}</span>`;
+}
+
+function posBadgeClass(pos) {
+  if (pos <= 5) return 'up';
+  if (pos <= 10) return 'warn';
+  return 'down';
+}
+
+// ── DOMAIN FILTER BUILDER ─────────────────────────────────
+// Always filters to whitelisted domains — prevents tnpsc-club, translate.goog etc leaking in
+function buildDomainFilter(domain) {
+  if (domain) {
+    // Specific domain selected
+    return {
+      filter: {
+        fieldName: 'hostname',
+        stringFilter: { matchType: 'EXACT', value: domain }
+      }
+    };
+  }
+  // No domain selected = all allowed domains via inListFilter
+  return {
+    filter: {
+      fieldName: 'hostname',
+      inListFilter: { values: CONFIG.ALLOWED_DOMAINS }
+    }
+  };
+}
+
+// ── FORMATTING ────────────────────────────────────────────
+function fmt(n) {
+  n = parseInt(n) || 0;
+  if (n >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if (n >= 1000) return (n/1000).toFixed(1)+'K';
+  return n.toLocaleString();
+}
+
+function fmtTime(s) {
+  s = parseFloat(s) || 0;
+  const m = Math.floor(s/60);
+  const sec = Math.round(s%60);
+  return m + ':' + String(sec).padStart(2,'0');
+}
+
+// ── UI HELPERS ────────────────────────────────────────────
+function updateFilterStatus(days, domain) {
+  const d = domain || 'all domains';
+  const now = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  document.getElementById('filterStatus').textContent = `Showing: ${d} · last ${days} days · ${now}`;
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBanner');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('errorBanner').style.display = 'none';
+}
+</script>
+</body>
+</html>
